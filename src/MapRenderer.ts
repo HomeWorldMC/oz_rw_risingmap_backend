@@ -182,7 +182,6 @@ export class MapRenderer extends WorkerProcess {
 		const targetImagePath = resolve(xPath, coords.y + ".png");
 		const targetLockFilePath = resolve(xPath, coords.y + ".lock");
 
-		!cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[saveTile]", `Saving ${targetImagePath}`);
 		try {
 			accessSync(xPath);
 		} catch (e) {
@@ -191,10 +190,12 @@ export class MapRenderer extends WorkerProcess {
 
 		try {
 			accessSync(targetLockFilePath);
-			return this.saveTile(mt,zoomLevel);
+			!cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[saveTile]", `Waiting for ${targetImagePath}`);
+			return this.saveTile(mt, zoomLevel);
 		} catch (error) {
-			writeFileSync(targetLockFilePath,"");
+			writeFileSync(targetLockFilePath, "");
 		}
+		!cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[saveTile]", `Saving ${targetImagePath}`);
 		const tCanvas = await this.loadTargetTileImage(targetImagePath);
 		!tCanvas.getContext ? console.log(tCanvas) : null;
 		// process.exit();
