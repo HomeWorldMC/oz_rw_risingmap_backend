@@ -61,7 +61,8 @@ export class MapRenderer extends WorkerProcess {
 
 	protected async run() {
 		if (this.jobs) {
-			const MT = await this.startRendering(...this.jobQueue.shift());
+			const data = this.jobQueue.shift();
+			const MT = await this.startRendering(...data);
 		}
 		this.timer.refresh();
 	}

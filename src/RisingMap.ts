@@ -43,7 +43,8 @@ export class RisingMap {
 
 	protected run() {
 		if (this.mapQueue.length > 0) {
-			this.sendRenderingJobToWorker(...this.mapQueue.shift());
+			const data = this.mapQueue.shift();
+			this.sendRenderingJobToWorker(...data);
 			this.rotationIndex++;
 		}
 		this.initWorker();
