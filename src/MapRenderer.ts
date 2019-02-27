@@ -1,5 +1,5 @@
 import { Canvas, createCanvas, Image } from 'canvas';
-import { accessSync, readFileSync, mkdirSync, createWriteStream, unlinkSync } from "fs";
+import { accessSync, readFileSync, mkdirSync, createWriteStream, unlinkSync, writeFileSync } from "fs";
 import { resolve } from "path";
 import { gunzipSync } from "zlib";
 import { WorkerProcess } from './WorkerProcess';
@@ -180,6 +180,7 @@ export class MapRenderer extends WorkerProcess {
 		const zoomPath = resolve(this.mapTargetPath, zoomLevel + '');
 		const xPath = resolve(zoomPath, coords.x + '');
 		const targetImagePath = resolve(xPath, coords.y + ".png");
+		const targetLockFilePath = resolve(xPath, coords.y + ".lock");
 
 		!cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[saveTile]", `Saving ${targetImagePath}`);
 		try {
@@ -188,6 +189,12 @@ export class MapRenderer extends WorkerProcess {
 			mkdirSync(xPath, { recursive: true });
 		}
 
+		try {
+			accessSync(targetLockFilePath);
+			return this.saveTile(mt,zoomLevel);
+		} catch (error) {
+			writeFileSync(targetLockFilePath,"");
+		}
 		const tCanvas = await this.loadTargetTileImage(targetImagePath);
 		!tCanvas.getContext ? console.log(tCanvas) : null;
 		// process.exit();
@@ -204,7 +211,10 @@ export class MapRenderer extends WorkerProcess {
 
 		return new Promise<MapTile>((resolve) => {
 			const MT: MapTile = { image: tCanvas, x: coords.x, y: coords.y, z: zoomLevel };
-			imageFileStream.on('finish', () => resolve(MT));
+			imageFileStream.on('finish', () => {
+				resolve(MT);
+				unlinkSync(targetLockFilePath);
+			});
 		});
 	}
 
