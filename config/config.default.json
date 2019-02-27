@@ -1,0 +1,27 @@
+{
+    "log": {
+        "info": true,
+        "debug": true,
+        "warn": true
+    },
+    "cli": {
+        "commands": [
+            "REBOOT"
+        ]
+    },
+    "app": {
+        "title": "RisingMap-BE"
+    },
+    "map": {
+        "root": "",
+        "id": ""
+    },
+    "websocket": {
+        "host": "localhost",
+        "port": 21338
+    },
+    "renderer": {
+        "nodes": 4,
+        "tick": 20
+    }
+}

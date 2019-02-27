@@ -1,0 +1,17 @@
+{
+	"name": "oz_rw_risingmap_backend",
+	"version": "0.1.0",
+	"scripts": {
+		"start": "node bin/main"
+	},
+	"private": true,
+	"dependencies": {
+		"rxjs": "^6.4.0",
+		"ws": "^6.1.4",
+		"canvas": "^2.3.1"
+	},
+	"devDependencies": {
+		"@types/node": "~10.12.18",
+		"@types/ws": "^6.0.1"
+	}
+}
