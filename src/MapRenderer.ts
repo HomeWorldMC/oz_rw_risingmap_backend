@@ -198,6 +198,7 @@ export class MapRenderer extends WorkerProcess {
 			});
 		} catch (error) {
 			writeFileSync(targetLockFilePath, "");
+			!cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[saveTile]", `wrote lockfile ${targetLockFilePath}`);
 		}
 		!cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[saveTile]", `Saving ${targetImagePath}`);
 		const tCanvas = await this.loadTargetTileImage(targetImagePath);
@@ -218,7 +219,12 @@ export class MapRenderer extends WorkerProcess {
 			const MT: MapTile = { image: tCanvas, x: coords.x, y: coords.y, z: zoomLevel };
 			imageFileStream.on('finish', () => {
 				resolve(MT);
-				unlinkSync(targetLockFilePath);
+				try {
+					unlinkSync(targetLockFilePath);
+					!cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[saveTile]", `unlinked lockfile ${targetLockFilePath}`);
+				} catch (error) {
+					console.log(LOGTAG.ERROR,'[saveTile]',`Could not delete lockfile ${targetLockFilePath}`)
+				}
 			});
 		});
 	}
