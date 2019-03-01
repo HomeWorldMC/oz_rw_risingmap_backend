@@ -62,7 +62,7 @@ export class MapRenderer extends WorkerProcess {
 	protected async run() {
 		if (this.jobs) {
 			const data = this.jobQueue.shift();
-			const MT = await this.startRendering(...data);
+			const MT = await this.startRendering(data[0], data[1], data[2]);
 		}
 		this.timer.refresh();
 	}
@@ -191,7 +191,7 @@ export class MapRenderer extends WorkerProcess {
 		try {
 			accessSync(targetLockFilePath);
 			!cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[saveTile]", `Waiting for ${targetImagePath}`);
-			return new Promise<MapTile>((resolve)=>{
+			return new Promise<MapTile>((resolve) => {
 				setTimeout(() => {
 					resolve(this.saveTile(mt, zoomLevel));
 				}, 250);
