@@ -191,7 +191,11 @@ export class MapRenderer extends WorkerProcess {
 		try {
 			accessSync(targetLockFilePath);
 			!cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[saveTile]", `Waiting for ${targetImagePath}`);
-			return this.saveTile(mt, zoomLevel);
+			return new Promise<MapTile>((resolve)=>{
+				setTimeout(() => {
+					resolve(this.saveTile(mt, zoomLevel));
+				}, 250);
+			});
 		} catch (error) {
 			writeFileSync(targetLockFilePath, "");
 		}
