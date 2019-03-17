@@ -42,7 +42,7 @@ export class MapRenderer extends WorkerProcess {
 	}
 
 	private get mapTargetPath(): string {
-		return cfg.map.root;
+		return cfg.map.destinationPath;
 	}
 
 	private jobQueue: [number, number, string][] = [];

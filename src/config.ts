@@ -4,10 +4,11 @@ import { resolve } from "path";
 
 export interface BaseConfig extends Config {
 	map: {
-		root: string,		// root path of destination images
-		id: string			// The Map ID (folder-name) e.g.:  0-0-0-0-4255_-1110502957_Vergessenes\ Land-1339424556
+		isGameServer: boolean,		// if true then rawPath is used with FSWatch, if false we use WebSocket Server
+		rawPath: string,			// root path of raw mt* files
+		destinationPath: string		// path to the converted map images
 	},
-	websocket: {			// WebSocket settings
+	websocket: {					// WebSocket settings
 		host: string,
 		port: number
 	},

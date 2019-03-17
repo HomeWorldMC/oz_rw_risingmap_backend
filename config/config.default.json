@@ -13,8 +13,9 @@
         "title": "RisingMap-BE"
     },
     "map": {
-        "root": "",
-        "id": ""
+        "isGameServer": true,
+        "rawPath": "",
+        "destinationPath": ""
     },
     "websocket": {
         "host": "localhost",

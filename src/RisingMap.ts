@@ -4,8 +4,8 @@ import * as WebSocket from "ws";
 import { BaseConfig, cfg as config, cfg } from "./config";
 import { LOGTAG } from "./lib/models/Config";
 import { resolve } from "path";
-import { mkdirSync, writeFileSync } from "fs";
-import { WorkerProcess } from "./WorkerProcess";
+import { mkdirSync, writeFileSync, FSWatcher, watch as watchFs, readFileSync, statSync } from "fs";
+// import { WorkerProcess } from "./WorkerProcess";
 
 /**
  * this code was written down very fast, i know some parts could be more elegant and i may change them with time!
@@ -26,6 +26,9 @@ export class RisingMap {
 		return config;
 	}
 
+	private fsw: FSWatcher = null;
+	private WatchMap: Map<string, NodeJS.Timer> = new Map<string, NodeJS.Timer>();
+	private MapCache: Map<string, Buffer> = new Map<string, Buffer>();
 	private wsServer: WebSocket.Server = null;
 
 	private mapQueue: [number, number, Buffer][] = [];
@@ -35,7 +38,11 @@ export class RisingMap {
 	private rotationIndex = 0;
 
 	private constructor() {
-		this.initWSServer();
+		if (cfg.map.isGameServer) {
+			this.initFSWatch();
+		} else {
+			this.initWSServer();
+		}
 		this.timer = setTimeout(() => {
 			this.run();
 		}, 25);
@@ -51,6 +58,12 @@ export class RisingMap {
 		this.timer.refresh();
 	}
 
+	/**
+	 * this method is used when this app is not installed on the game server
+	 *
+	 * @protected
+	 * @memberof RisingMap
+	 */
 	protected initWSServer(): void {
 		!this.cfg.log.info ? null : console.log(LOGTAG.INFO, "[initWSServer]", `Starting WebSocket Server @${this.cfg.websocket.host}:${this.cfg.websocket.port}`);
 		this.wsServer = new WebSocket.Server({ host: this.cfg.websocket.host, port: this.cfg.websocket.port });
@@ -74,6 +87,44 @@ export class RisingMap {
 		});
 	}
 
+	/**
+	 * this method is used when this app is directly installed on the game server
+	 *
+	 * @protected
+	 * @memberof RisingMap
+	 */
+	protected initFSWatch() {
+		!this.cfg.log.info ? null : console.log(LOGTAG.INFO, "[initFSWatch]", `Watching ${this.cfg.map.rawPath}`);
+		this.fsw = watchFs(this.cfg.map.rawPath, (event: string, f: string) => {
+			// console.log(event, f);
+			if (f.startsWith("mt")) {
+
+				if (!this.WatchMap.has(f)) {
+					const T = setTimeout(() => {
+						const [_, px, py] = f.split("_");
+						const mapFilePath = resolve(this.cfg.map.rawPath, f);
+						const mapFile = readFileSync(mapFilePath);
+						this.sendRenderingJobToWorker(Number(px), Number(py), mapFile);
+						this.rotationIndex++;
+
+					}, 2000);
+					this.WatchMap.set(f, T);
+				}
+				this.WatchMap.get(f).refresh();
+			}
+		});
+	}
+
+	/**
+	 *
+	 *
+	 * @protected
+	 * @param {number} x
+	 * @param {number} y
+	 * @param {Buffer} map
+	 * @returns
+	 * @memberof RisingMap
+	 */
 	protected sendRenderingJobToWorker(x: number, y: number, map: Buffer) {
 		const Worker = this.rendererList[this.rotationIndex];
 		if (!Worker) {
@@ -102,6 +153,13 @@ export class RisingMap {
 		Worker.send({ type: 'job', x: x, y: y, hash: mapHash });
 	}
 
+	/**
+	 *
+	 *
+	 * @protected
+	 * @returns {void}
+	 * @memberof RisingMap
+	 */
 	protected initWorker(): void {
 
 		this.rendererList = this.rendererList.filter(v => v.process.connected);
@@ -136,5 +194,9 @@ export class RisingMap {
 		}).on("online", () => {
 			!this.cfg.log.info ? null : console.log(LOGTAG.INFO, '[RisingMap:initWorker]', `Worker[${W.id}/${type}]: online`);
 		});
+	}
+
+	public destroy() {
+		this.fsw.close();
 	}
 }
