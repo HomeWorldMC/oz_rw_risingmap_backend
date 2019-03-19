@@ -233,10 +233,10 @@ export class MapRenderer extends WorkerProcess {
 	 *
 	 *
 	 * @param {string} sourcePath
-	 * @returns {Canvas}
+	 * @returns {Promise<Canvas>}
 	 * @memberof MapRenderer
 	 */
-	public async loadTargetTileImage(sourcePath: string): Canvas {
+	public async loadTargetTileImage(sourcePath: string): Promise<Canvas> {
 		const P = new Promise(resolve => {
 			const Canvas = createCanvas(256, 256);
 			const ctx: CanvasRenderingContext2D = Canvas.getContext('2d');

@@ -1,6 +1,8 @@
 {
 	"compileOnSave": false,
 	"compilerOptions": {
+		"newLine": "LF",
+		"watch": false,
 		"baseUrl": "./",
 		"outDir": "./bin",
 		"sourceMap": true,

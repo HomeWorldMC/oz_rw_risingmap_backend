@@ -4,9 +4,10 @@
 	"scripts": {
 		"start": "node bin/main"
 	},
+	"main": "bin/main.js",
 	"private": true,
 	"dependencies": {
-		"canvas": "^2.4.0",
+		"canvas": "2.3.0",
 		"rxjs": "^6.4.0",
 		"ws": "^6.2.0"
 	},
