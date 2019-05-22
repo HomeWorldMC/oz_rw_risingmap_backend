@@ -1,23 +1,25 @@
-import { Canvas, createCanvas, Image } from 'canvas';
-import { accessSync, readFileSync, mkdirSync, createWriteStream, unlinkSync, writeFileSync } from "fs";
+import { Canvas, createCanvas, loadImage, Image } from 'canvas';
+import { accessSync, createWriteStream, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "fs";
 import { resolve } from "path";
 import { gunzipSync } from "zlib";
-import { WorkerProcess } from './WorkerProcess';
 import { cfg } from './config';
 import { LOGTAG } from './lib/models/Config';
+import { WorkerProcess } from './WorkerProcess';
 
 export interface RawTile {
 	z: number,
 	x: number,
 	y: number,
-	raw: Buffer
+	raw: Buffer,
+	client: string
 };
 
 export interface MapTile {
 	z: number,
 	x: number,
 	y: number,
-	image: Canvas
+	image: Canvas,
+	client: string
 }
 
 export interface ZoomCoords {
@@ -45,13 +47,24 @@ export class MapRenderer extends WorkerProcess {
 		return cfg.map.destinationPath;
 	}
 
-	private jobQueue: [number, number, string][] = [];
+	private jobQueue: [number, number, string, string][] = [];
 	private timer: NodeJS.Timer = null;
 
+	/**
+	 *
+	 *
+	 * @readonly
+	 * @type {number}
+	 * @memberof MapRenderer
+	 */
 	public get jobs(): number {
 		return this.jobQueue.length;
 	}
 
+	/**
+	 *Creates an instance of MapRenderer.
+	 * @memberof MapRenderer
+	 */
 	private constructor() {
 		super();
 		this.timer = setTimeout(() => {
@@ -59,20 +72,44 @@ export class MapRenderer extends WorkerProcess {
 		}, cfg.renderer.tick);
 	}
 
+	/**
+	 *
+	 *
+	 * @protected
+	 * @memberof MapRenderer
+	 */
 	protected async run() {
 		if (this.jobs) {
-			const data = this.jobQueue.shift();
-			const MT = await this.startRendering(data[0], data[1], data[2]);
+			const [x, y, map, client] = this.jobQueue.shift();
+			const MT = await this.startRendering(x, y, map, client);
 		}
 		this.timer.refresh();
 	}
 
-	public addJob(x: number, y: number, hash: string) {
-		this.jobQueue.push([x, y, hash]);
+	/**
+	 *
+	 *
+	 * @param {number} x
+	 * @param {number} y
+	 * @param {string} hash
+	 * @memberof MapRenderer
+	 */
+	public addJob(x: number, y: number, hash: string, client: string) {
+		this.jobQueue.push([x, y, hash, client]);
 	}
 
-	private async startRendering(x: number, y: number, hash: string): Promise<MapTile> {
-		const cacheFile = resolve(__dirname, '..', 'cache', hash);
+	/**
+	 *
+	 *
+	 * @private
+	 * @param {number} x
+	 * @param {number} y
+	 * @param {string} hash
+	 * @returns {Promise<MapTile>}
+	 * @memberof MapRenderer
+	 */
+	private async startRendering(x: number, y: number, hash: string, client: string): Promise<MapTile> {
+		const cacheFile = resolve(process.cwd(), 'cache', hash);
 		try {
 			accessSync(cacheFile);
 			const frs = readFileSync(cacheFile);
@@ -81,7 +118,8 @@ export class MapRenderer extends WorkerProcess {
 				z: this.originZoom,
 				x: -Number(x),
 				y: -Number(y),
-				raw: raw
+				raw: raw,
+				client: client
 			});
 			let z = this.originZoom;
 			do {
@@ -125,7 +163,7 @@ export class MapRenderer extends WorkerProcess {
 	 */
 	public convertRawTile(rt: RawTile): MapTile {
 		const C: Canvas = createCanvas(256, 256);
-		const ctx: CanvasRenderingContext2D = C.getContext('2d');
+		const ctx = C.getContext('2d');
 
 		let offset = 0;
 		let index = 0;
@@ -156,7 +194,8 @@ export class MapRenderer extends WorkerProcess {
 			z: rt.z,
 			x: rt.x,
 			y: rt.y,
-			image: C
+			image: C,
+			client: rt.client
 		}
 	}
 
@@ -177,7 +216,7 @@ export class MapRenderer extends WorkerProcess {
 			factor: 1
 		};
 
-		const zoomPath = resolve(this.mapTargetPath, zoomLevel + '');
+		const zoomPath = resolve(this.mapTargetPath, mt.client, zoomLevel + '');
 		const xPath = resolve(zoomPath, coords.x + '');
 		const targetImagePath = resolve(xPath, coords.y + ".png");
 		const targetLockFilePath = resolve(xPath, coords.y + ".lock");
@@ -205,7 +244,7 @@ export class MapRenderer extends WorkerProcess {
 		!tCanvas.getContext ? console.log(tCanvas) : null;
 		// process.exit();
 
-		const ctx: CanvasRenderingContext2D = tCanvas.getContext('2d');
+		const ctx = tCanvas.getContext('2d');
 		const dSize = coords.factor * 256;
 		// console.log(mt);
 		ctx.drawImage(mt.image, coords.sx * 256, coords.sy * 256, dSize, dSize);
@@ -216,14 +255,14 @@ export class MapRenderer extends WorkerProcess {
 		stream.pipe(imageFileStream);
 
 		return new Promise<MapTile>((resolve) => {
-			const MT: MapTile = { image: tCanvas, x: coords.x, y: coords.y, z: zoomLevel };
+			const MT: MapTile = { image: tCanvas, x: coords.x, y: coords.y, z: zoomLevel, client: mt.client };
 			imageFileStream.on('finish', () => {
 				resolve(MT);
 				try {
 					unlinkSync(targetLockFilePath);
 					!cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[saveTile]", `unlinked lockfile ${targetLockFilePath}`);
 				} catch (error) {
-					console.log(LOGTAG.ERROR,'[saveTile]',`Could not delete lockfile ${targetLockFilePath}`)
+					console.log(LOGTAG.ERROR, '[saveTile]', `Could not delete lockfile ${targetLockFilePath}`)
 				}
 			});
 		});
@@ -237,32 +276,16 @@ export class MapRenderer extends WorkerProcess {
 	 * @memberof MapRenderer
 	 */
 	public async loadTargetTileImage(sourcePath: string): Promise<Canvas> {
-		const P = new Promise(resolve => {
-			const Canvas = createCanvas(256, 256);
-			const ctx: CanvasRenderingContext2D = Canvas.getContext('2d');
-			try {
-				accessSync(sourcePath);
-				let input = readFileSync(sourcePath),
-					img = new Image();
-				img.onload = () => {
-					ctx.drawImage(img, 0, 0);
-					resolve(Canvas);
-				};
-				img.onerror = (e) => {
-					// console.log('[ImageLoader::loadImage]', `Error reading image on path ${sourcePath}, unlinking file!`, input);
-					// reject(e);
-					resolve(Canvas);
-				};
-				img.src = input;
 
-			} catch (error) {
-				// console.log(error);
-				// reject(error);
-				resolve(Canvas);
-			}
-		});
-		const Canvas: Canvas = await P;
-		return Canvas;
+		const tCanvas = createCanvas(256, 256);
+		try {
+			const image = await loadImage(sourcePath);
+			const ctx = tCanvas.getContext('2d');
+			ctx.drawImage(image, 0, 0);
+		} catch (error) {
+			// just return empty Canvas
+		}
+		return tCanvas;
 	}
 
 	/**
@@ -289,7 +312,7 @@ export class MapRenderer extends WorkerProcess {
 			// sx: Math.abs(Math.abs(rx)-1+(1/factor)),
 			// sy: Math.abs(Math.abs(ry)-1+(1/factor)),
 			sx: Math.abs(rx),//mt.x > 0 ? Math.abs(rx) : Math.abs(Math.abs(rx) - 1 + (1 / factor)),
-			sy: Math.abs(ry), //mt.y < 0 ? Math.abs(Math.abs(ry) - 1 + (1 / factor)) : 
+			sy: Math.abs(ry), //mt.y < 0 ? Math.abs(Math.abs(ry) - 1 + (1 / factor)) :
 			// factor 4 = 0.25
 			// 0.00 = 0.00-1.00 = -1.00+0.25 => Abs(0.75)
 			// 0.25 = 0.25-1.00 = -0.75+0.25 => Abs(0.50)

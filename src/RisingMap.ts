@@ -7,6 +7,8 @@ import { resolve } from "path";
 import { mkdirSync, writeFileSync, FSWatcher, watch as watchFs, readFileSync, statSync } from "fs";
 // import { WorkerProcess } from "./WorkerProcess";
 
+import { ExtendedWebSocket } from "./models/ExtendedWebSocket";
+
 /**
  * this code was written down very fast, i know some parts could be more elegant and i may change them with time!
  *
@@ -28,19 +30,26 @@ export class RisingMap {
 
 	private fsw: FSWatcher = null;
 	private WatchMap: Map<string, NodeJS.Timer> = new Map<string, NodeJS.Timer>();
-	private MapCache: Map<string, Buffer> = new Map<string, Buffer>();
+	// private MapCache: Map<string, Buffer> = new Map<string, Buffer>();
 	private wsServer: WebSocket.Server = null;
 
-	private mapQueue: [number, number, Buffer][] = [];
+	private mapQueue: [number, number, Buffer, string][] = [];
 	private timer: NodeJS.Timer = null;
 
 	private rendererList: clusterWorker[] = [];
 	private rotationIndex = 0;
 
+	/**
+	 *Creates an instance of RisingMap.
+	 * @memberof RisingMap
+	 */
 	private constructor() {
 		if (cfg.map.isGameServer) {
+			!this.cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[RisingMap] => initFSWatch");
 			this.initFSWatch();
-		} else {
+		}
+		if (cfg.websocket.enabled) {
+			!this.cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[RisingMap] => initWSServer");
 			this.initWSServer();
 		}
 		this.timer = setTimeout(() => {
@@ -48,10 +57,16 @@ export class RisingMap {
 		}, 25);
 	}
 
+	/**
+	 *
+	 *
+	 * @protected
+	 * @memberof RisingMap
+	 */
 	protected run() {
 		if (this.mapQueue.length > 0) {
-			const data = this.mapQueue.shift();
-			this.sendRenderingJobToWorker(data[0], data[1], data[2]);
+			const [x, y, map, client] = this.mapQueue.shift();
+			this.sendRenderingJobToWorker(x, y, map, client);
 			this.rotationIndex++;
 		}
 		this.initWorker();
@@ -67,24 +82,67 @@ export class RisingMap {
 	protected initWSServer(): void {
 		!this.cfg.log.info ? null : console.log(LOGTAG.INFO, "[initWSServer]", `Starting WebSocket Server @${this.cfg.websocket.host}:${this.cfg.websocket.port}`);
 		this.wsServer = new WebSocket.Server({ host: this.cfg.websocket.host, port: this.cfg.websocket.port });
-		this.wsServer.on('connection', (ws, request) => {
-			!this.cfg.log.info ? null : console.log(LOGTAG.INFO, "[connection]", `Client connected from ${request.connection.remoteAddress}`);
-			ws.on('message', (data) => {
-				// !this.cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[onMessage]", `Message of type ${typeof data} received`);
-				if (typeof data == "object") {
-					const msg: Buffer = <Buffer>data;
-					const x = msg.readInt16BE(0);
-					const y = msg.readInt16BE(2);
-					const map = msg.slice(4);
+		this.wsServer.on('connection', (ws: ExtendedWebSocket, req) => {
+			const [, type, client] = req.url.split("/");
 
-					this.sendRenderingJobToWorker(x, y, map);
-					this.rotationIndex++;
+			ws.clientData.type = type;
+			ws.clientData.clientId = createHash("sha256").update(req.connection.remoteAddress).digest("hex");
+
+			if (cfg.websocket.whitelist.length > 0 && !cfg.websocket.whitelist.includes(req.connection.remoteAddress)) {
+				ws.send(Buffer.from([0x00, "Your client is not whitelisted, bye"]));
+				ws.terminate();
+			} else {
+
+				!this.cfg.log.info ? null : console.log(LOGTAG.INFO, "[connection]", `Client <${type}> connected from ${req.connection.remoteAddress}`);
+
+				if (type == "rmp") {
+					this.setupMapPluginClient(ws);
+				} else if (type == "rmf") {
+					// this.setupMapFrontendClient(ws);
 				}
-			});
-			ws.on("close", (code, reason) => {
-				!this.cfg.log.info ? null : console.log(LOGTAG.INFO, "[connection]", `Client ${request.connection.remoteAddress} disconnected with code ${code} and reason ${reason}`);
-			})
+
+				ws.on("close", (code, reason) => {
+					!this.cfg.log.info ? null : console.log(LOGTAG.INFO, "[connection]", `Client ${req.connection.remoteAddress} of type <${type}> disconnected with code ${code} and reason ${reason}`);
+				});
+			}
 		});
+	}
+
+	/**
+	 *
+	 *
+	 * @protected
+	 * @param {WebSocket} ws
+	 * @memberof RisingMap
+	 */
+	protected setupMapPluginClient(ws: ExtendedWebSocket): void {
+		ws.on('message', (data) => {
+			if (!Buffer.isBuffer(data)) {
+				!cfg.log.warn ? null : console.log(LOGTAG.WARN, "[setupMapPluginClient]", "non buffer message: ", data);
+			}
+			const code = (<Buffer>data).byteLength > 0 ? (<Buffer>data).readInt8(0) : null;
+			const rawData = (<Buffer>data).byteLength > 0 ? Buffer.from((<Buffer>data).subarray(1)) : null;
+			switch (code) {
+				case 0x01: // A map tile sent from plugin
+					const x = rawData.readInt32BE(0);
+					const y = rawData.readInt32BE(4);
+					const map = Buffer.from(rawData.subarray(8));
+					this.sendRenderingJobToWorker(x, y, map, ws.clientData.clientId);
+					// console.log(`x: ${x}, y:${y} map:${map.length}`);
+					this.rotationIndex++;
+					break;
+
+				default:
+					console.log(`Unknown data <${data.toString()}> <${(<Buffer>data).byteLength}>`);
+					break;
+			}
+		});
+		// const debug = setTimeout(() => {
+		// 	console.log(`Sending debug text/buffer`);
+		// 	ws.send("Hello Text");
+		// 	ws.send(Buffer.from("Hello Buffer"));
+		// 	debug.refresh();
+		// }, 5000);
 	}
 
 	/**
@@ -104,7 +162,7 @@ export class RisingMap {
 						const [_, px, py] = f.split("_");
 						const mapFilePath = resolve(this.cfg.map.rawPath, f);
 						const mapFile = readFileSync(mapFilePath);
-						this.sendRenderingJobToWorker(Number(px), Number(py), mapFile);
+						this.sendRenderingJobToWorker(Number(px), Number(py), mapFile, "localhost");
 						this.rotationIndex++;
 
 					}, 2000);
@@ -125,18 +183,18 @@ export class RisingMap {
 	 * @returns
 	 * @memberof RisingMap
 	 */
-	protected sendRenderingJobToWorker(x: number, y: number, map: Buffer) {
+	protected sendRenderingJobToWorker(x: number, y: number, map: Buffer, client: string) {
 		const Worker = this.rendererList[this.rotationIndex];
 		if (!Worker) {
 			this.rotationIndex = -1;
-			this.mapQueue.push([x, y, map]);
+			this.mapQueue.push([x, y, map, client]);
 			return;
 		}
 		const mapHash = createHash("sha256").update(map).digest("hex");
-		!this.cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[sendRenderingJobToWorker:MapTile]", `MapTile for ${x} ${y} <${mapHash}>`);
+		!this.cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[sendRenderingJobToWorker:MapTile]", `MapTile ${x} ${y} <${mapHash}> for <${client}>`);
 		// Save map file to cache folder
-		const cacheDir = resolve(__dirname, '..', 'cache');
-		const cacheFile = resolve(__dirname, '..', 'cache', mapHash);
+		const cacheDir = resolve(process.cwd(), 'cache');
+		const cacheFile = resolve(process.cwd(), 'cache', mapHash);
 		try {
 			mkdirSync(cacheDir, { recursive: true });
 		} catch (error) {
@@ -146,11 +204,11 @@ export class RisingMap {
 		try {
 			writeFileSync(cacheFile, map);
 		} catch (error) {
-			console.log(LOGTAG.ERROR, "[sendRenderingJobToWorker:initWorker]", error);
+			console.log(LOGTAG.ERROR, "[sendRenderingJobToWorker:writeFileSync]", error);
 			return;
 		}
 
-		Worker.send({ type: 'job', x: x, y: y, hash: mapHash });
+		Worker.send({ type: 'job', x: x, y: y, hash: mapHash, client: client });
 	}
 
 	/**
@@ -172,7 +230,7 @@ export class RisingMap {
 		let W: clusterWorker = null;
 		const type = "maprenderer";
 		setupMaster({
-			exec: process.argv[1] + "/../worker.js",
+			exec: __dirname + "/worker.js",
 			args: [type] //, x + '', y + '', mapHash
 		});
 		W = forkChild();

@@ -6,54 +6,54 @@ import { worker } from 'cluster';
 
 
 
-// Workaround for nexe, without worker.js is not included into the executable
-// export const nexe = true;
-// if (worker) {
+// Workaround for pgk/nexe, without worker.js is not included into the executable
+export const nexe = true;
+if (worker) {
 
-const processType = process.argv[2];
-let Application: WorkerProcess = null;
+	const [, , processType] = process.argv;
+	let Application: WorkerProcess = null;
 
-process.title = `${worker.id}-${processType}`;
-const timer: NodeJS.Timer = setTimeout(() => { st(); }, 250);
-const st = function () {
-	const numJobs = (Application as MapRenderer).jobs;
-	process.title = `${processType}-${worker.id}: ` + (numJobs ? 'rendering ' + numJobs + ' jobs' : 'IDLE');
-	timer.refresh();
-};
+	process.title = `${worker.id}-${processType}`;
+	const timer: NodeJS.Timer = setTimeout(() => { st(); }, 250);
+	const st = function () {
+		const numJobs = (Application as MapRenderer).jobs;
+		process.title = `${processType}-${worker.id}: ` + (numJobs ? 'rendering ' + numJobs + ' jobs' : 'IDLE');
+		timer.refresh();
+	};
 
-switch (processType) {
-	case 'maprenderer':
-		Application = MapRenderer.getInstance();
-		break;
-	default:
-		!cfg.log.warn ? null : console.log(LOGTAG.WARN, 'Invalid module');
-		break;
-}
+	switch (processType) {
+		case 'maprenderer':
+			Application = MapRenderer.getInstance();
+			break;
+		default:
+			!cfg.log.warn ? null : console.log(LOGTAG.WARN, 'Invalid module');
+			break;
+	}
 
-if (Application) {
-	process.on('message', (msg: any) => {
-		if (typeof msg == "string") {
+	if (Application) {
+		process.on('message', (msg: any) => {
+			if (typeof msg == "string") {
 
-			switch (msg) {
-				case 'shutdown':
-				case 'reboot':
-					Application.destroy().then(() => {
-						process.exit();
-					});
-					break;
+				switch (msg) {
+					case 'shutdown':
+					case 'reboot':
+						Application.destroy().then(() => {
+							process.exit();
+						});
+						break;
 
-				default:
-					console.log(LOGTAG.ERROR, `Invalid message ${msg}`);
-					break;
+					default:
+						console.log(LOGTAG.ERROR, `Invalid message ${msg}`);
+						break;
+				}
+			} else {
+				switch (msg.type) {
+					case "job":
+						(Application as MapRenderer).addJob(msg.x, msg.y, msg.hash, msg.client);
+						// console.log(LOGTAG.DEBUG,`Job for ${msg.x}x ${msg.y} received`);
+						break;
+				}
 			}
-		} else {
-			switch (msg.type) {
-				case "job":
-					(Application as MapRenderer).addJob(msg.x, msg.y, msg.hash);
-					// console.log(LOGTAG.DEBUG,`Job for ${msg.x}x ${msg.y} received`);
-					break;
-			}
-		}
-	});
+		});
+	}
 }
-// }

@@ -9,15 +9,17 @@ export interface BaseConfig extends Config {
 		destinationPath: string		// path to the converted map images
 	},
 	websocket: {					// WebSocket settings
+		enabled: boolean,
 		host: string,
-		port: number
+		port: number,
+		whitelist: string[]			// if there is any entry, the webSocket is whitelisted. If not, the websocket will accept any client
 	},
-	renderer:{
+	renderer: {
 		nodes: number,
 		tick: number
 	}
 }
 
-var C = ConfigLoader.getInstance<BaseConfig>(resolve(__dirname, "..", "config"));
+var C = ConfigLoader.getInstance<BaseConfig>(resolve(process.cwd(), "config"));
 
 export var cfg: BaseConfig = C.cfg;
