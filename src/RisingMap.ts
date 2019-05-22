@@ -85,6 +85,7 @@ export class RisingMap {
 		this.wsServer.on('connection', (ws: ExtendedWebSocket, req) => {
 			const [, type, client] = req.url.split("/");
 
+			ws.clientData = ws.clientData || { clientId: null, type: null };
 			ws.clientData.type = type;
 			ws.clientData.clientId = createHash("sha256").update(req.connection.remoteAddress).digest("hex");
 
