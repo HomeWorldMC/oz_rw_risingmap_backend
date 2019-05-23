@@ -93,7 +93,7 @@ export class RisingMap {
 				ws.send(Buffer.from([0x00, "Your client is not whitelisted, bye"]));
 				ws.terminate();
 			} else {
-
+				ws.send(Buffer.from([0x02, ws.clientData.clientId]));
 				!this.cfg.log.info ? null : console.log(LOGTAG.INFO, "[connection]", `Client <${type}> connected from ${req.connection.remoteAddress}`);
 
 				if (type == "rmp") {
