@@ -85,16 +85,18 @@ export class RisingMap {
 		this.wsServer.on('connection', (ws: ExtendedWebSocket, req) => {
 			const [, type, client] = req.url.split("/");
 
+			const remoteAddr = req.headers['x-forwarded-for'] + '' || req.connection.remoteAddress;
+
 			ws.clientData = ws.clientData || { clientId: null, type: null };
 			ws.clientData.type = type;
-			ws.clientData.clientId = createHash("sha256").update(req.connection.remoteAddress).digest("hex");
+			ws.clientData.clientId = createHash("sha256").update(remoteAddr).digest("hex");
 
-			if (cfg.websocket.whitelist.length > 0 && !cfg.websocket.whitelist.includes(req.connection.remoteAddress)) {
+			if (cfg.websocket.whitelist.length > 0 && !cfg.websocket.whitelist.includes(remoteAddr)) {
 				ws.send(Buffer.from([0x00, "Your client is not whitelisted, bye"]));
 				ws.terminate();
 			} else {
 				ws.send(Buffer.concat([Buffer.of(0x02), Buffer.from(ws.clientData.clientId, "UTF8")]));
-				!this.cfg.log.info ? null : console.log(LOGTAG.INFO, "[connection]", `Client <${type}> connected from ${req.connection.remoteAddress}`);
+				!this.cfg.log.info ? null : console.log(LOGTAG.INFO, "[connection]", `Client <${type}> connected from ${remoteAddr}`);
 
 				if (type == "rmp") {
 					this.setupMapPluginClient(ws);
@@ -103,7 +105,7 @@ export class RisingMap {
 				}
 
 				ws.on("close", (code, reason) => {
-					!this.cfg.log.info ? null : console.log(LOGTAG.INFO, "[connection]", `Client ${req.connection.remoteAddress} of type <${type}> disconnected with code ${code} and reason ${reason}`);
+					!this.cfg.log.info ? null : console.log(LOGTAG.INFO, "[connection]", `Client ${remoteAddr} of type <${type}> disconnected with code ${code} and reason ${reason}`);
 				});
 			}
 		});
