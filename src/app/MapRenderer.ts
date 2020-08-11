@@ -2,8 +2,8 @@ import { Canvas, createCanvas, loadImage, Image } from 'canvas';
 import { accessSync, createWriteStream, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "fs";
 import { resolve } from "path";
 import { gunzipSync } from "zlib";
-import { cfg } from './config';
-import { LOGTAG } from './lib/models/Config';
+import { cfg } from '../config';
+import { LOGTAG } from '../lib/models/Config';
 import { WorkerProcess } from './WorkerProcess';
 
 export interface RawTile {

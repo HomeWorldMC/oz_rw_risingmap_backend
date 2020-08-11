@@ -2,21 +2,25 @@
 	"name": "oz_rw_risingmap_backend",
 	"version": "0.2.0-SNAPSHOT",
 	"scripts": {
-		"start": "node bin/main"
+		"build": "rm -rf dist && tsc -p tsconfig.build.json",
+		"start": "node dist/app"
 	},
 	"bin": {
-		"rm-main": "./bin/main.js",
+		"rm-main": "./dist/app.js",
 		"rm-renderer": "./bin/worker.js"
 	},
-	"main": "bin/main.js",
+	"main": "dist/app.js",
 	"private": true,
 	"dependencies": {
 		"canvas": "^2.5.0",
+		"dotenv": "^8.2.0",
+		"module-alias": "^2.2.2",
 		"rxjs": "^6.5.2",
 		"ws": "^7.0.0"
 	},
 	"devDependencies": {
-		"@types/node": "^10.14.2",
-		"@types/ws": "^6.0.1"
+		"@types/node": "^14.0.27",
+		"@types/ws": "^7.2.6",
+		"typescript": "^3.9.7"
 	}
 }

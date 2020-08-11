@@ -1,13 +1,11 @@
-import { fork as forkChild, setupMaster, Worker as clusterWorker, workers } from "cluster";
+import { fork as forkChild, setupMaster, Worker as clusterWorker } from "cluster";
 import { createHash } from "crypto";
-import * as WebSocket from "ws";
-import { BaseConfig, cfg as config, cfg } from "./config";
-import { LOGTAG } from "./lib/models/Config";
+import { FSWatcher, mkdirSync, readFileSync, watch as watchFs, writeFileSync } from "fs";
 import { resolve } from "path";
-import { mkdirSync, writeFileSync, FSWatcher, watch as watchFs, readFileSync, statSync } from "fs";
+import * as WebSocket from "ws";
+import { LOGTAG } from "../lib/models/Config";
 // import { WorkerProcess } from "./WorkerProcess";
-
-import { ExtendedWebSocket } from "./models/ExtendedWebSocket";
+import { ExtendedWebSocket } from "../models/ExtendedWebSocket";
 
 /**
  * this code was written down very fast, i know some parts could be more elegant and i may change them with time!
@@ -22,10 +20,6 @@ export class RisingMap {
 			RisingMap.highlander = new RisingMap();
 		}
 		return RisingMap.highlander;
-	}
-
-	private get cfg(): BaseConfig {
-		return config;
 	}
 
 	private fsw: FSWatcher = null;

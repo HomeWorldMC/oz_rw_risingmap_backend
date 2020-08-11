@@ -1,8 +1,9 @@
-import { cfg } from './config';
-import { LOGTAG } from './lib/models/Config';
-import { MapRenderer } from './MapRenderer';
-import { WorkerProcess } from './WorkerProcess';
+'use strict';
+require('dotenv').config();
+import { MapRenderer } from './app/MapRenderer';
+import { WorkerProcess } from './app/WorkerProcess';
 import { worker } from 'cluster';
+import { Logger, Loglevel } from './util';
 
 
 
@@ -26,7 +27,7 @@ if (worker) {
 			Application = MapRenderer.getInstance();
 			break;
 		default:
-			!cfg.log.warn ? null : console.log(LOGTAG.WARN, 'Invalid module');
+			Logger(Loglevel.WARNING, 'worker', 'Invalid module');
 			break;
 	}
 
@@ -43,7 +44,7 @@ if (worker) {
 						break;
 
 					default:
-						console.log(LOGTAG.ERROR, `Invalid message ${msg}`);
+						Logger(Loglevel.ERROR, 'worker', `Invalid message ${msg}`);
 						break;
 				}
 			} else {

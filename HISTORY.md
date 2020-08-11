@@ -9,6 +9,9 @@
 - due to new API we can now also read raw tiles from the local system (must be installed on the gameserver)
 - Config setting to turn on websocket server (for map file transfer and live data)
 ### Changed
+- refactoring project structure
+- using `yarn` instead of npm now
+- using `dotenv` instead of json files now
 - map files now have an additional subdirectory indicating the source
 
 ## [0.1.0] - 2019-02-27

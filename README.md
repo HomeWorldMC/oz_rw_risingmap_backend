@@ -31,3 +31,22 @@ node bin/main; #run test, CTRL+C to end
 
 ## Windows build
 soon... (maybe on request)
+
+
+# .env content
+Adjust for your Environment
+```
+APP_TITLE=RisingMap-BE
+APP_WSS_PORT=21338
+APP_WSS_HOST=localhost
+
+MAP_GAMESERVER=true
+MAP_RAW_PATH=/mnt/s/SteamLibrary/steamapps/common/RisingWorld/plugins/RisingMaps/tiles/
+MAP_DESTINATION_PATH=/srv/www/rwmap/tiles
+
+RENDERER_NODES=4
+RENDERER_TICK=20
+
+LOGLEVEL=0
+LOGCOLOR=true
+```
