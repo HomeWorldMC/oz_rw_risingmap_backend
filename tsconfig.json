@@ -72,6 +72,8 @@
 	},
 	"exclude": [
 		"node_modules",
-		"dist"
+		"dist",
+		"src/util/Mongo*",
+		"src/util/interfaces/Mongo*"
 	]
 }

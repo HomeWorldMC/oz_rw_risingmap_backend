@@ -3,7 +3,7 @@
 	"version": "0.2.0-SNAPSHOT",
 	"scripts": {
 		"build": "rm -rf dist && tsc -p tsconfig.build.json",
-		"start": "node dist/app"
+		"start:prod": "node dist/app"
 	},
 	"bin": {
 		"rm-main": "./dist/app.js",
@@ -22,5 +22,8 @@
 		"@types/node": "^14.0.27",
 		"@types/ws": "^7.2.6",
 		"typescript": "^3.9.7"
+	},
+	"_moduleAliases": {
+		"@": "dist"
 	}
 }

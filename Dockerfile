@@ -16,6 +16,19 @@ FROM node:alpine as runtime
 
 WORKDIR /app
 
+#  add libraries needed to build canvas
+RUN apk add --no-cache \
+    build-base \
+    g++ \
+    libpng \
+    libpng-dev \
+    jpeg-dev \
+    pango-dev \
+    cairo-dev \
+    giflib-dev \
+    python \
+    ;
+
 ENV NODE_ENV=production
 
 COPY --from=builder "/app/dist/" "/app/dist"

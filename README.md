@@ -35,13 +35,16 @@ soon... (maybe on request)
 
 # .env content
 Adjust for your Environment
-```
+
+```ini
 APP_TITLE=RisingMap-BE
 APP_WSS_PORT=21338
 APP_WSS_HOST=localhost
 
+# if you use docker set GAMESERVER=false
 MAP_GAMESERVER=true
 MAP_RAW_PATH=/mnt/s/SteamLibrary/steamapps/common/RisingWorld/plugins/RisingMaps/tiles/
+
 MAP_DESTINATION_PATH=/srv/www/rwmap/tiles
 
 RENDERER_NODES=4
@@ -49,4 +52,10 @@ RENDERER_TICK=20
 
 LOGLEVEL=0
 LOGCOLOR=true
+```
+
+# using docker
+```ps
+docker build -t rwrmbe .
+docker run -dp 21338:21338 --name RW-RM-Backend rwrmbe
 ```

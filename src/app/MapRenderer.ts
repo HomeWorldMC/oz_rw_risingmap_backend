@@ -1,9 +1,8 @@
-import { Canvas, createCanvas, loadImage, Image } from 'canvas';
+import { Logger, Loglevel } from '@/util';
+import { Canvas, createCanvas, loadImage } from 'canvas';
 import { accessSync, createWriteStream, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "fs";
 import { resolve } from "path";
 import { gunzipSync } from "zlib";
-import { cfg } from '../config';
-import { LOGTAG } from '../lib/models/Config';
 import { WorkerProcess } from './WorkerProcess';
 
 export interface RawTile {
@@ -44,7 +43,7 @@ export class MapRenderer extends WorkerProcess {
 	}
 
 	private get mapTargetPath(): string {
-		return cfg.map.destinationPath;
+		return process.env.MAP_DESTINATION_PATH;
 	}
 
 	private jobQueue: [number, number, string, string][] = [];
@@ -69,7 +68,7 @@ export class MapRenderer extends WorkerProcess {
 		super();
 		this.timer = setTimeout(() => {
 			this.run();
-		}, cfg.renderer.tick);
+		}, Number(process.env.RENDERER_TICK));
 	}
 
 	/**
@@ -130,7 +129,7 @@ export class MapRenderer extends WorkerProcess {
 			unlinkSync(cacheFile);
 			return Layer;
 		} catch (error) {
-			console.log(LOGTAG.ERROR, error);
+			Logger(Loglevel.ERROR, 'MapRenderer', error);
 			return null;
 		}
 	}
@@ -229,7 +228,7 @@ export class MapRenderer extends WorkerProcess {
 
 		try {
 			accessSync(targetLockFilePath);
-			!cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[saveTile]", `Waiting for ${targetImagePath}`);
+			Logger(Loglevel.DEBUG, 'MapRenderer', "[saveTile]", `Waiting for ${targetImagePath}`);
 			return new Promise<MapTile>((resolve) => {
 				setTimeout(() => {
 					resolve(this.saveTile(mt, zoomLevel));
@@ -237,9 +236,9 @@ export class MapRenderer extends WorkerProcess {
 			});
 		} catch (error) {
 			writeFileSync(targetLockFilePath, "");
-			!cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[saveTile]", `wrote lockfile ${targetLockFilePath}`);
+			Logger(Loglevel.DEBUG, 'MapRenderer', "[saveTile]", `wrote lockfile ${targetLockFilePath}`);
 		}
-		!cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[saveTile]", `Saving ${targetImagePath}`);
+		Logger(Loglevel.DEBUG, 'MapRenderer', "[saveTile]", `Saving ${targetImagePath}`);
 		const tCanvas = await this.loadTargetTileImage(targetImagePath);
 		!tCanvas.getContext ? console.log(tCanvas) : null;
 		// process.exit();
@@ -260,9 +259,9 @@ export class MapRenderer extends WorkerProcess {
 				resolve(MT);
 				try {
 					unlinkSync(targetLockFilePath);
-					!cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[saveTile]", `unlinked lockfile ${targetLockFilePath}`);
+					Logger(Loglevel.DEBUG, 'MapRenderer', "[saveTile]", `unlinked lockfile ${targetLockFilePath}`);
 				} catch (error) {
-					console.log(LOGTAG.ERROR, '[saveTile]', `Could not delete lockfile ${targetLockFilePath}`)
+					Logger(Loglevel.ERROR, 'MapRenderer', '[saveTile]', `Could not delete lockfile ${targetLockFilePath}`)
 				}
 			});
 		});

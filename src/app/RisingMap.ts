@@ -1,11 +1,12 @@
+import { Logger, Loglevel } from "@/util";
 import { fork as forkChild, setupMaster, Worker as clusterWorker } from "cluster";
 import { createHash } from "crypto";
 import { FSWatcher, mkdirSync, readFileSync, watch as watchFs, writeFileSync } from "fs";
 import { resolve } from "path";
 import * as WebSocket from "ws";
-import { LOGTAG } from "../lib/models/Config";
 // import { WorkerProcess } from "./WorkerProcess";
 import { ExtendedWebSocket } from "../models/ExtendedWebSocket";
+import { cwd } from "process";
 
 /**
  * this code was written down very fast, i know some parts could be more elegant and i may change them with time!
@@ -38,12 +39,12 @@ export class RisingMap {
 	 * @memberof RisingMap
 	 */
 	private constructor() {
-		if (cfg.map.isGameServer) {
-			!this.cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[RisingMap] => initFSWatch");
+		if (process.env.MAP_GAMESERVER) {
+			Logger(Loglevel.DEBUG, 'RisingMap', "[RisingMap] => initFSWatch");
 			this.initFSWatch();
 		}
-		if (cfg.websocket.enabled) {
-			!this.cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[RisingMap] => initWSServer");
+		if (process.env.APP_WSS_ENABLED) {
+			Logger(Loglevel.DEBUG, 'RisingMap', "[RisingMap] => initWSServer");
 			this.initWSServer();
 		}
 		this.timer = setTimeout(() => {
@@ -74,8 +75,8 @@ export class RisingMap {
 	 * @memberof RisingMap
 	 */
 	protected initWSServer(): void {
-		!this.cfg.log.info ? null : console.log(LOGTAG.INFO, "[initWSServer]", `Starting WebSocket Server @${this.cfg.websocket.host}:${this.cfg.websocket.port}`);
-		this.wsServer = new WebSocket.Server({ host: this.cfg.websocket.host, port: this.cfg.websocket.port });
+		Logger(Loglevel.INFO, 'RisingMap', "[initWSServer]", `Starting WebSocket Server @${process.env.APP_WSS_HOST}:${process.env.APP_WSS_PORT}`);
+		this.wsServer = new WebSocket.Server({ host: process.env.APP_WSS_HOST, port: Number(process.env.APP_WSS_PORT) });
 		this.wsServer.on('connection', (ws: ExtendedWebSocket, req) => {
 			const [, type, client] = req.url.split("/");
 
@@ -85,12 +86,16 @@ export class RisingMap {
 			ws.clientData.type = type;
 			ws.clientData.clientId = createHash("sha256").update(remoteAddr).digest("hex");
 
-			if (cfg.websocket.whitelist.length > 0 && !cfg.websocket.whitelist.includes(remoteAddr)) {
+			// TODO refactor, save whitelist somewhere else
+			const whitelist = [];
+
+			if (whitelist.length > 0 && !whitelist.includes(remoteAddr)) {
 				ws.send(Buffer.from([0x00, "Your client is not whitelisted, bye"]));
 				ws.terminate();
 			} else {
-				ws.send(Buffer.concat([Buffer.of(0x02), Buffer.from(ws.clientData.clientId, "UTF8")]));
-				!this.cfg.log.info ? null : console.log(LOGTAG.INFO, "[connection]", `Client <${type}> connected from ${remoteAddr}`);
+				const response = Buffer.from(ws.clientData.clientId);
+				ws.send(Buffer.concat([Buffer.of(0x02), response]));
+				Logger(Loglevel.INFO, 'RisingMap', "[connection]", `Client <${type}> connected from ${remoteAddr}`);
 
 				if (type == "rmp") {
 					this.setupMapPluginClient(ws);
@@ -99,7 +104,7 @@ export class RisingMap {
 				}
 
 				ws.on("close", (code, reason) => {
-					!this.cfg.log.info ? null : console.log(LOGTAG.INFO, "[connection]", `Client ${remoteAddr} of type <${type}> disconnected with code ${code} and reason ${reason}`);
+					Logger(Loglevel.INFO, 'RisingMap', "[connection]", `Client ${remoteAddr} of type <${type}> disconnected with code ${code} and reason ${reason}`);
 				});
 			}
 		});
@@ -115,7 +120,7 @@ export class RisingMap {
 	protected setupMapPluginClient(ws: ExtendedWebSocket): void {
 		ws.on('message', (data) => {
 			if (!Buffer.isBuffer(data)) {
-				!cfg.log.warn ? null : console.log(LOGTAG.WARN, "[setupMapPluginClient]", "non buffer message: ", data);
+				Logger(Loglevel.WARNING, 'RisingMap', "[setupMapPluginClient]", "non buffer message: ", data);
 			}
 			const code = (<Buffer>data).byteLength > 0 ? (<Buffer>data).readInt8(0) : null;
 			const rawData = (<Buffer>data).byteLength > 0 ? Buffer.from((<Buffer>data).subarray(1)) : null;
@@ -149,15 +154,15 @@ export class RisingMap {
 	 * @memberof RisingMap
 	 */
 	protected initFSWatch() {
-		!this.cfg.log.info ? null : console.log(LOGTAG.INFO, "[initFSWatch]", `Watching ${this.cfg.map.rawPath}`);
-		this.fsw = watchFs(this.cfg.map.rawPath, (event: string, f: string) => {
+		Logger(Loglevel.INFO, 'RisingMap', "[initFSWatch]", `Watching ${process.env.MAP_RAW_PATH}`);
+		this.fsw = watchFs(process.env.MAP_RAW_PATH, (event: string, f: string) => {
 			// console.log(event, f);
 			if (f.startsWith("mt")) {
 
 				if (!this.WatchMap.has(f)) {
 					const T = setTimeout(() => {
 						const [_, px, py] = f.split("_");
-						const mapFilePath = resolve(this.cfg.map.rawPath, f);
+						const mapFilePath = resolve(process.env.MAP_RAW_PATH, f);
 						const mapFile = readFileSync(mapFilePath);
 						this.sendRenderingJobToWorker(Number(px), Number(py), mapFile, "localhost");
 						this.rotationIndex++;
@@ -188,7 +193,7 @@ export class RisingMap {
 			return;
 		}
 		const mapHash = createHash("sha256").update(map).digest("hex");
-		!this.cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[sendRenderingJobToWorker:MapTile]", `MapTile ${x} ${y} <${mapHash}> for <${client}>`);
+		Logger(Loglevel.DEBUG, 'RisingMap', "[sendRenderingJobToWorker:MapTile]", `MapTile ${x} ${y} <${mapHash}> for <${client}>`);
 		// Save map file to cache folder
 		const cacheDir = resolve(process.cwd(), 'cache');
 		const cacheFile = resolve(process.cwd(), 'cache', mapHash);
@@ -201,7 +206,7 @@ export class RisingMap {
 		try {
 			writeFileSync(cacheFile, map);
 		} catch (error) {
-			console.log(LOGTAG.ERROR, "[sendRenderingJobToWorker:writeFileSync]", error);
+			Logger(Loglevel.ERROR, 'RisingMap', "[sendRenderingJobToWorker:writeFileSync]", error);
 			return;
 		}
 
@@ -219,7 +224,7 @@ export class RisingMap {
 
 		this.rendererList = this.rendererList.filter(v => v.process.connected);
 		// const curWorker = Object.keys(workers).length;
-		if (this.rendererList.length >= cfg.renderer.nodes) {
+		if (this.rendererList.length >= Number(process.env.RENDERER_NODES)) {
 			return;
 		}
 
@@ -227,7 +232,7 @@ export class RisingMap {
 		let W: clusterWorker = null;
 		const type = "maprenderer";
 		setupMaster({
-			exec: __dirname + "/worker.js",
+			exec: cwd() + "/dist/worker.js",
 			args: [type] //, x + '', y + '', mapHash
 		});
 		W = forkChild();
@@ -235,19 +240,19 @@ export class RisingMap {
 		this.rendererList.push(W);
 
 		W.on("exit", (c: number, s: string) => {
-			!this.cfg.log.warn ? null : console.log(LOGTAG.WARN, '[RisingMap:initWorker]', `Worker[${W.id}/${type}]: exited`);
+			Logger(Loglevel.WARNING, 'RisingMap', '[RisingMap:initWorker]', `Worker[${W.id}/${type}]: exited`);
 		});
 
 		W.on("close", (c: number, s: string) => {
-			!this.cfg.log.warn ? null : console.log(LOGTAG.WARN, '[RisingMap:initWorker]', `Worker[${W.id}/${type}]: closed`);
+			Logger(Loglevel.WARNING, 'RisingMap', '[RisingMap:initWorker]', `Worker[${W.id}/${type}]: closed`);
 		}).on("disconnect", () => {
-			!this.cfg.log.warn ? null : console.log(LOGTAG.WARN, '[RisingMap:initWorker]', `Worker[${W.id}/${type}]: disconnected`);
+			Logger(Loglevel.WARNING, 'RisingMap', '[RisingMap:initWorker]', `Worker[${W.id}/${type}]: disconnected`);
 		}).on("error", (e: Error) => {
-			!this.cfg.log.warn ? null : console.log(LOGTAG.WARN, '[RisingMap:initWorker]', `Worker[${W.id}/${type}]: error ${e.toString()}`);
+			Logger(Loglevel.WARNING, 'RisingMap', '[RisingMap:initWorker]', `Worker[${W.id}/${type}]: error ${e.toString()}`);
 		}).on("message", (msg: any) => {
-			!this.cfg.log.debug ? null : console.log(LOGTAG.DEBUG, '[RisingMap:initWorker]', `Worker[${W.id}/${type}]: ${msg}`);
+			Logger(Loglevel.DEBUG, 'RisingMap', '[RisingMap:initWorker]', `Worker[${W.id}/${type}]: ${msg}`);
 		}).on("online", () => {
-			!this.cfg.log.info ? null : console.log(LOGTAG.INFO, '[RisingMap:initWorker]', `Worker[${W.id}/${type}]: online`);
+			Logger(Loglevel.INFO, 'RisingMap', '[RisingMap:initWorker]', `Worker[${W.id}/${type}]: online`);
 		});
 	}
 
