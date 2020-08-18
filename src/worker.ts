@@ -1,5 +1,4 @@
 'use strict';
-require('dotenv').config();
 import 'module-alias/register';
 import { MapRenderer } from './app/MapRenderer';
 import { WorkerProcess } from './app/WorkerProcess';
