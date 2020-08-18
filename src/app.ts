@@ -1,5 +1,4 @@
 'use strict';
-require('dotenv').config();
 import 'module-alias/register';
 import { RisingMap } from "./app/RisingMap";
 import { nexe } from "./worker";
