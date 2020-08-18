@@ -1,0 +1,26 @@
+version: '3.1'
+services:
+
+  rwmapbackend:
+    build: .
+    restart: always
+    container_name: node_rw_map_backend_lb
+    volumes:
+      - maptiles:/srv/www/rwmap/tiles
+    ports:
+      - 21338:21338
+    environment:
+      APP_TITLE: ${APP_TITLE}
+      APP_WSS_ENABLED: ${APP_WSS_ENABLED}
+      APP_WSS_PORT: ${APP_WSS_PORT}
+      APP_WSS_HOST: ${APP_WSS_HOST}
+      APPLOGLEVEL: ${APP_LOGLEVEL}
+      APPLOGCOLOR: ${APP_LOGCOLOR}
+      MAP_GAMESERVER: ${MAP_GAMESERVER}
+      MAP_RAW_PATH: ${MAP_RAW_PATH}
+      MAP_DESTINATION_PATH: ${MAP_DESTINATION_PATH}
+      RENDERER_NODES: ${RENDERER_NODES}
+      RENDERER_TICK: ${RENDERER_TICK}
+
+volumes:
+  maptiles:

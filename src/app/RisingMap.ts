@@ -39,11 +39,11 @@ export class RisingMap {
 	 * @memberof RisingMap
 	 */
 	private constructor() {
-		if (process.env.MAP_GAMESERVER) {
+		if ([true, 1, 'true', '1'].includes(process.env.MAP_GAMESERVER.toLowerCase())) {
 			Logger(Loglevel.DEBUG, 'RisingMap', "[RisingMap] => initFSWatch");
 			this.initFSWatch();
 		}
-		if (process.env.APP_WSS_ENABLED) {
+		if ([true, 1, 'true', '1'].includes(process.env.APP_WSS_ENABLED.toLowerCase())) {
 			Logger(Loglevel.DEBUG, 'RisingMap', "[RisingMap] => initWSServer");
 			this.initWSServer();
 		}
